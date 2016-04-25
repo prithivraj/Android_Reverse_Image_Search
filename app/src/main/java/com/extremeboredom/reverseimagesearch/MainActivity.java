@@ -10,8 +10,11 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.DialogAction;
+import com.afollestad.materialdialogs.MaterialDialog;
 import com.extremeboredom.reverseimagesearch.helpers.DocumentHelper;
 import com.extremeboredom.reverseimagesearch.imgurmodel.ImageResponse;
 import com.extremeboredom.reverseimagesearch.imgurmodel.Upload;
@@ -26,12 +29,12 @@ import retrofit.RetrofitError;
 import retrofit.client.Response;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback{
-
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
     private static Activity instance = null;
     private static String[] PERMISSIONS_STORAGE = {
             Manifest.permission.READ_EXTERNAL_STORAGE,
     };
+    MaterialDialog.Builder dialogBuilder;
 
     public static void verifyStoragePermissions(Activity activity) {
         // Check if we have write permission
@@ -61,7 +64,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             df.setRoundingMode(RoundingMode.DOWN);
             Toast.makeText(instance, "Uploading... Your file is " + df.format(chosenFile.length()/1048576f)+ "MB", Toast.LENGTH_LONG).show();
             uploadService.Execute(upload, new UiCallback());
-
+            startAnim();
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
@@ -70,7 +73,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         protected void onCreate (Bundle savedInstanceState){
             super.onCreate(savedInstanceState);
             setContentView(R.layout.activity_main);
-           instance = this;
+            dialogBuilder= new MaterialDialog.Builder(this);
+            instance = this;
 
         if (getIntent().getAction() == Intent.ACTION_SEND) {
                 verifyStoragePermissions(this);
@@ -87,18 +91,50 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private class UiCallback implements Callback<ImageResponse> {
 
         @Override
-        public void success(ImageResponse imageResponse, Response response) {
+        public void success(final ImageResponse imageResponse, Response response) {
             Log.d("", "");
-            String URL = "https://www.google.com/searchbyimage?site=search&sa=X&image_url=" + imageResponse.data.link;
-            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL));
-            startActivity(browserIntent);
-            instance.finish();
+            stopAnim();
+            dialogBuilder
+                    .title("Select your search engine")
+                    .negativeText("Tineye.com")
+                    .positiveText("Google Images")
+                    .onPositive(new MaterialDialog.SingleButtonCallback() {
+                        @Override
+                        public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
+                            dialog.dismiss();
+                            String URL = "https://www.google.com/searchbyimage?site=search&sa=X&image_url=" + imageResponse.data.link;
+                            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL));
+                            startActivity(browserIntent);
+                            instance.finish();
+                        }
+                    })
+                    .onNegative(new MaterialDialog.SingleButtonCallback() {
+                        @Override
+                        public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
+                            dialog.dismiss();
+                            String URL = "https://www.tineye.com/search?url=" + imageResponse.data.link;
+                            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL));
+                            startActivity(browserIntent);
+                            instance.finish();
+                        }
+                    })
+                    .cancelable(false)
+                    .build().show();
         }
 
         @Override
         public void failure(RetrofitError error) {
             //Assume we have no connection, since error is null
+            stopAnim();
             Toast.makeText(instance, "Oops, No internet connection.", Toast.LENGTH_LONG).show();
         }
+    }
+
+    void startAnim(){
+        findViewById(R.id.avloadingIndicatorView).setVisibility(View.VISIBLE);
+    }
+
+    void stopAnim(){
+        findViewById(R.id.avloadingIndicatorView).setVisibility(View.GONE);
     }
 }
